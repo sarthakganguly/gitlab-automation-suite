@@ -22,42 +22,66 @@ class GitLabService:
         self.private_token = private_token
         self.gl = None
         try:
-            self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token, ssl_verify=False, timeout=10) 
+            self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token, ssl_verify=False, timeout=20) 
             self.gl.auth()
             current_app.logger.info(f"Successfully connected to GitLab at {self.gitlab_url}")
         except (gitlab.exceptions.GitlabAuthenticationError, requests.exceptions.RequestException) as e:
             current_app.logger.error(f"GitLab connection failed: {e}")
             raise ConnectionError(f"Failed to connect or authenticate with GitLab. Details: {e}") from e
 
+    def get_project(self, project_id):
+        """Fetches a single project object by its ID."""
+        try:
+            return self.gl.projects.get(project_id)
+        except Exception as e:
+            current_app.logger.error(f"Error fetching project {project_id}: {e}")
+            return None
+
+    def get_single_issue(self, project_id, issue_iid):
+        """Fetches a single, complete issue object."""
+        try:
+            project = self.gl.projects.get(project_id, lazy=True)
+            return project.issues.get(issue_iid)
+        except Exception as e:
+            current_app.logger.error(f"Error fetching single issue {project_id}/{issue_iid}: {e}")
+            return None
+
+    def get_issue_label_events(self, project_id, issue_iid):
+        """Fetches all resource label events for a specific issue."""
+        try:
+            project = self.gl.projects.get(project_id, lazy=True)
+            issue = project.issues.get(issue_iid, lazy=True)
+            return issue.resourcelabelevents.list(all=True)
+        except Exception as e:
+            current_app.logger.error(f"Error fetching label events for issue {project_id}/{issue_iid}: {e}")
+            return []
+            
+    def get_issue_milestone_events(self, project_id, issue_iid):
+        """Fetches all resource milestone events for a specific issue."""
+        try:
+            project = self.gl.projects.get(project_id, lazy=True)
+            issue = project.issues.get(issue_iid, lazy=True)
+            return issue.resourcemilestoneevents.list(all=True)
+        except Exception as e:
+            current_app.logger.error(f"Error fetching milestone events for issue {project_id}/{issue_iid}: {e}")
+            return []
+
     def execute_graphql(self, query, variables=None):
-        """Executes a GraphQL query by substituting variables directly into the query string."""
+        """Executes a GraphQL query using the standard payload format."""
         graphql_url = f"{self.gitlab_url}/api/graphql"
         headers = {
             'Authorization': f'Bearer {self.private_token}',
             'Content-Type': 'application/json'
         }
-
-        # Substitute variables directly into the query string
-        if variables:
-            for key, value in variables.items():
-                # GraphQL requires string literals to be in double quotes.
-                # We use json.dumps to handle proper escaping of the string.
-                query = query.replace(f'${key}', json.dumps(value))
         
-        # Remove the variable definition part of the query, e.g., ($fullPath: ID!, ...)
-        final_query = re.sub(r'query(\s+\w+)?\s*\([^)]*\)', 'query', query)
-        
-        # Remove newlines and extra whitespace to create a clean, single-line query
-        final_query = " ".join(final_query.split())
-
-        payload = {'query': final_query}
+        payload = {'query': query, 'variables': variables}
 
         try:
             current_app.logger.info(f"Attempting GraphQL POST to: {graphql_url}")
-            current_app.logger.info(f"GraphQL Payload: {payload}")
+            current_app.logger.info(f"GraphQL Payload: {json.dumps(payload)}")
             
             response = requests.post(graphql_url, headers=headers, json=payload, verify=False)
-            response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
+            response.raise_for_status()
             
             response_data = response.json()
             current_app.logger.info(f"GraphQL Response: {json.dumps(response_data)}")
@@ -75,7 +99,6 @@ class GitLabService:
     def get_lead_cycle_time_metrics(self, scope_full_path, scope_type, start_date, end_date):
         """Fetches Lead and Cycle time by first finding the value stream and then querying its stages."""
         
-        # Step 1: Get the first available value stream for the scope
         value_stream_query = f"""
             query GetValueStreams($fullPath: ID!) {{
               {scope_type}(fullPath: $fullPath) {{
@@ -95,20 +118,19 @@ class GitLabService:
         if not value_streams:
             raise Exception("No value streams found for this scope.")
             
-        value_stream_id = value_streams[0]['id'] # Use the first value stream
+        value_stream_id = value_streams[0]['id']
         current_app.logger.info(f"Found value stream '{value_streams[0]['name']}' with ID: {value_stream_id}")
 
-        # Step 2: Get the metrics for that value stream's stages
         metrics_query = """
             query GetAllStageMetrics($fullPath: ID!, $vsId: [AnalyticsCycleAnalyticsValueStreamID!], $startDate: Date!, $endDate: Date!) {
               %s(fullPath: $fullPath) {
-                valueStreams(ids: $vsId) {
+                valueStream(ids: $vsId) {
                   nodes {
                     stages {
                       nodes {
                         id
                         name
-                        metrics(timeframe: { start: $startDate, end: $endDate }) {
+                        metrics(from: $startDate, to: $endDate) {
                           median {
                             value
                           }
@@ -129,9 +151,7 @@ class GitLabService:
         }
         
         metrics_result = self.execute_graphql(metrics_query, metric_vars)
-        
-        # Navigate through the corrected structure
-        vs_nodes = metrics_result.get('data', {}).get(scope_type, {}).get('valueStreams', {}).get('nodes', [])
+        vs_nodes = metrics_result.get('data', {}).get(scope_type, {}).get('valueStream', {}).get('nodes', [])
         if not vs_nodes:
             raise Exception("Could not retrieve metrics for the value stream.")
 
@@ -294,13 +314,13 @@ class GitLabService:
             current_app.logger.error(f"Error fetching members for {scope_type} ID {scope_id}: {e}")
             return []
     
-    def get_milestones(self, group_id, **kwargs):
-        """Fetches milestones for a given group."""
+    def get_milestones(self, scope_id, scope_type, **kwargs):
+        """Fetches milestones for a given group or project."""
         try:
-            group = self.gl.groups.get(group_id)
-            return group.milestones.list(all=True, as_list=True, **kwargs)
+            scope = self.get_scope_object(scope_id, scope_type)
+            return scope.milestones.list(all=True, as_list=True, **kwargs)
         except Exception as e:
-            current_app.logger.error(f"Error fetching milestones for group {group_id}: {e}")
+            current_app.logger.error(f"Error fetching milestones for {scope_type} {scope_id}: {e}")
             return []
     
     def get_single_milestone(self, group_id, milestone_id):

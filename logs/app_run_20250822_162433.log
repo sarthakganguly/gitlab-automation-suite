@@ -1,0 +1,6 @@
+2025-08-22 17:17:58,097 INFO: Fetched ALL 67 issues with filters: {'milestone': '2025-Aug-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]
+2025-08-22 17:18:25,032 INFO: Fetched ALL 44 issues with filters: {'milestone': '2025-Sep-02', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]
+2025-08-22 17:18:56,945 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-22 17:19:45,079 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-22 17:19:45,082 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:367]
+2025-08-22 17:19:46,978 INFO: Fetched ALL 67 issues with filters: {'milestone': '2025-Aug-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]

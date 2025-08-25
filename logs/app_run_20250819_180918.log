@@ -1,0 +1,67 @@
+2025-08-19 18:09:18,893 INFO: GitLab Analytics Hub startup [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:32]
+2025-08-19 18:09:18,895 INFO: --- PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:35]
+2025-08-19 18:09:18,896 INFO: App Root Path: D:\Documents\Code\gitlab-automation-suite\app [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:36]
+2025-08-19 18:09:18,897 INFO: App Template Folder: templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:37]
+2025-08-19 18:09:18,897 INFO: Full Template Path: D:\Documents\Code\gitlab-automation-suite\app\templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:38]
+2025-08-19 18:09:18,904 INFO: --- END PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:39]
+2025-08-19 18:09:21,666 INFO: --- BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:46]
+2025-08-19 18:09:21,667 INFO: Registered Blueprint: 'main' [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:48]
+2025-08-19 18:09:21,667 INFO:   - Blueprint Template Folder: ../templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:49]
+2025-08-19 18:09:21,667 INFO: --- END BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:50]
+2025-08-19 18:09:30,909 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:09:30,910 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:364]
+2025-08-19 18:09:42,296 INFO: Fetched ALL 700 issues with filters: {'created_after': '2025-07-01', 'created_before': '2025-08-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:271]
+2025-08-19 18:09:42,737 ERROR: Report generation failed: Cannot subtract tz-naive and tz-aware datetime-like objects.
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 117, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 392, in generate_triage_to_milestone_report
+    lag = (milestone_due_date - triage_date).total_seconds() / (3600 * 24) # Lag in days
+           ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+  File "pandas/_libs/tslibs/timestamps.pyx", line 514, in pandas._libs.tslibs.timestamps._Timestamp.__sub__
+TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects.
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:174]
+2025-08-19 18:12:30,343 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:12:30,344 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:364]
+2025-08-19 18:12:42,701 INFO: Fetched ALL 700 issues with filters: {'created_after': '2025-07-01', 'created_before': '2025-08-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:271]
+2025-08-19 18:12:43,108 ERROR: Report generation failed: Cannot subtract tz-naive and tz-aware datetime-like objects.
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 117, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 392, in generate_triage_to_milestone_report
+    lag = (milestone_due_date - triage_date).total_seconds() / (3600 * 24) # Lag in days
+           ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+  File "pandas/_libs/tslibs/timestamps.pyx", line 514, in pandas._libs.tslibs.timestamps._Timestamp.__sub__
+TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects.
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:174]
+2025-08-19 18:12:48,880 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:12:53,124 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:13:03,402 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:13:32,469 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 18:13:32,470 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:364]
+2025-08-19 18:13:46,155 INFO: Fetched ALL 700 issues with filters: {'created_after': '2025-07-01', 'created_before': '2025-08-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:271]
+2025-08-19 18:13:47,067 ERROR: Report generation failed: Cannot subtract tz-naive and tz-aware datetime-like objects.
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 117, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 392, in generate_triage_to_milestone_report
+    lag = (milestone_due_date - triage_date).total_seconds() / (3600 * 24) # Lag in days
+           ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+  File "pandas/_libs/tslibs/timestamps.pyx", line 514, in pandas._libs.tslibs.timestamps._Timestamp.__sub__
+TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects.
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:174]

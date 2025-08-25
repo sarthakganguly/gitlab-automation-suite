@@ -28,7 +28,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ url_for('main.download_detailed_milestone_report', group_id=group_id, milestone_id=m.id) }}" class="btn btn-sm btn-info" title="Download Detailed HTML Report">
+                    <a href="{{ url_for('main.download_detailed_milestone_report', scope_id=scope_id, scope_type=scope_type, group_id=m.group_id, milestone_id=m.id) }}" class="btn btn-sm btn-info" title="Download Detailed HTML Report">
                         <i class="bi bi-file-earmark-arrow-down"></i> Report
                     </a>
                 </td>

@@ -1,0 +1,7 @@
+2025-08-20 22:46:08,835 INFO: Fetched ALL 96 issues with filters: {'milestone': '2025-Aug-05', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]
+2025-08-20 22:46:12,506 INFO: Fetched ALL 89 issues with filters: {'milestone': '2025-Aug-12', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]
+2025-08-20 22:46:16,760 INFO: Fetched ALL 67 issues with filters: {'milestone': '2025-Aug-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:289]
+2025-08-20 22:50:02,680 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-20 22:51:53,685 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-20 22:52:37,655 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-20 22:52:42,740 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]

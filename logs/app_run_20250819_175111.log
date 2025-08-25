@@ -1,0 +1,48 @@
+2025-08-19 17:51:11,593 INFO: GitLab Analytics Hub startup [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:32]
+2025-08-19 17:51:11,595 INFO: --- PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:35]
+2025-08-19 17:51:11,596 INFO: App Root Path: D:\Documents\Code\gitlab-automation-suite\app [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:36]
+2025-08-19 17:51:11,596 INFO: App Template Folder: templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:37]
+2025-08-19 17:51:11,596 INFO: Full Template Path: D:\Documents\Code\gitlab-automation-suite\app\templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:38]
+2025-08-19 17:51:11,597 INFO: --- END PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:39]
+2025-08-19 17:51:14,284 INFO: --- BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:46]
+2025-08-19 17:51:14,285 INFO: Registered Blueprint: 'main' [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:48]
+2025-08-19 17:51:14,285 INFO:   - Blueprint Template Folder: ../templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:49]
+2025-08-19 17:51:14,285 INFO: --- END BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:50]
+2025-08-19 17:55:31,627 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:55:43,953 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:56:00,010 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:56:05,288 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:56:17,146 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:56:30,604 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 17:56:30,605 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:364]
+2025-08-19 17:56:43,213 INFO: Fetched ALL 700 issues with filters: {'created_after': '2025-07-01', 'created_before': '2025-08-19', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:272]
+2025-08-19 17:56:43,228 ERROR: Report generation failed: 'GroupIssue' object has no attribute 'resourcemilestoneevents'
+
+<class 'gitlab.v4.objects.issues.GroupIssue'> was created via a list()
+call and only a subset of the data may be present. To ensure all data
+is present get the object using a get(object.id) call. For more
+details, see:
+
+https://python-gitlab.readthedocs.io/en/v6.2.0/faq.html#attribute-error-list
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 117, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 381, in generate_triage_to_milestone_report
+    events = issue.resourcemilestoneevents.list(all=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sarth\AppData\Local\Programs\Python\Python313\Lib\site-packages\gitlab\base.py", line 133, in __getattr__
+    raise AttributeError(message)
+AttributeError: 'GroupIssue' object has no attribute 'resourcemilestoneevents'
+
+<class 'gitlab.v4.objects.issues.GroupIssue'> was created via a list()
+call and only a subset of the data may be present. To ensure all data
+is present get the object using a get(object.id) call. For more
+details, see:
+
+https://python-gitlab.readthedocs.io/en/v6.2.0/faq.html#attribute-error-list
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:174]

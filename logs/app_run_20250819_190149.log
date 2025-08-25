@@ -1,0 +1,27 @@
+2025-08-19 19:01:49,341 INFO: GitLab Analytics Hub startup [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:32]
+2025-08-19 19:01:49,343 INFO: --- PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:35]
+2025-08-19 19:01:49,343 INFO: App Root Path: D:\Documents\Code\gitlab-automation-suite\app [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:36]
+2025-08-19 19:01:49,344 INFO: App Template Folder: templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:37]
+2025-08-19 19:01:49,345 INFO: Full Template Path: D:\Documents\Code\gitlab-automation-suite\app\templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:38]
+2025-08-19 19:01:49,346 INFO: --- END PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:39]
+2025-08-19 19:01:51,959 INFO: --- BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:46]
+2025-08-19 19:01:51,961 INFO: Registered Blueprint: 'main' [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:48]
+2025-08-19 19:01:51,963 INFO:   - Blueprint Template Folder: ../templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:49]
+2025-08-19 19:01:51,964 INFO: --- END BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:50]
+2025-08-19 19:02:04,277 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-19 19:02:04,278 INFO: Generating Triage to Milestone Lag Report. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:364]
+2025-08-19 19:02:44,240 INFO: Fetched ALL 1882 issues with filters: {'created_after': '2025-01-01', 'created_before': '2025-08-19', 'milestone': 'Any', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:280]
+2025-08-19 19:02:44,248 ERROR: Report generation failed: 'GitLabService' object has no attribute 'get_single_issue'
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 117, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 381, in generate_triage_to_milestone_report
+    full_issue = gl_service.get_single_issue(issue.project_id, issue.iid)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitLabService' object has no attribute 'get_single_issue'. Did you mean: 'get_single_milestone'?
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:174]

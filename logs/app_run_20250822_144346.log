@@ -1,0 +1,7 @@
+2025-08-22 14:45:59,139 ERROR: Report generation failed: too many values to unpack (expected 2)
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 136, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+    ^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:199]

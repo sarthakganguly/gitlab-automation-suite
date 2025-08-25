@@ -1,0 +1,30 @@
+2025-08-18 18:14:47,792 INFO: GitLab Analytics Hub startup [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:32]
+2025-08-18 18:14:47,793 INFO: --- PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:35]
+2025-08-18 18:14:47,794 INFO: App Root Path: D:\Documents\Code\gitlab-automation-suite\app [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:36]
+2025-08-18 18:14:47,794 INFO: App Template Folder: templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:37]
+2025-08-18 18:14:47,794 INFO: Full Template Path: D:\Documents\Code\gitlab-automation-suite\app\templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:38]
+2025-08-18 18:14:47,797 INFO: --- END PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:39]
+2025-08-18 18:14:48,790 INFO: --- BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:46]
+2025-08-18 18:14:48,790 INFO: Registered Blueprint: 'main' [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:48]
+2025-08-18 18:14:48,791 INFO:   - Blueprint Template Folder: ../templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:49]
+2025-08-18 18:14:48,791 INFO: --- END BLUEPRINT DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:50]
+2025-08-18 18:14:54,815 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-18 18:15:01,466 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-18 18:15:14,260 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-18 18:16:05,374 INFO: Successfully connected to GitLab at https://emu.hinagro.com [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:27]
+2025-08-18 18:16:05,374 INFO: Generating Time in Status Report for 4 months. [in D:\Documents\Code\gitlab-automation-suite\app\main\logic.py:93]
+2025-08-18 18:16:30,674 INFO: Fetched ALL 1614 issues with filters: {'created_after': '2025-04-18', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:272]
+2025-08-18 18:17:40,532 ERROR: Report generation failed: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\routes.py", line 116, in generate_report
+    chart_data, error_msg = ReportGenerator.generate_time_in_status_report(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        gl_service, data['scope_id'], data['scope_type'], data['months'], data['stage_labels']
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Documents\Code\gitlab-automation-suite\app\main\logic.py", line 123, in generate_time_in_status_report
+    label_name = event.label['name']
+                 ~~~~~~~~~~~^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+ [in D:\Documents\Code\gitlab-automation-suite\app\main\routes.py:162]

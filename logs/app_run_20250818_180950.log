@@ -1,0 +1,6 @@
+2025-08-18 18:09:50,519 INFO: GitLab Analytics Hub startup [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:32]
+2025-08-18 18:09:50,521 INFO: --- PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:35]
+2025-08-18 18:09:50,521 INFO: App Root Path: D:\Documents\Code\gitlab-automation-suite\app [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:36]
+2025-08-18 18:09:50,522 INFO: App Template Folder: templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:37]
+2025-08-18 18:09:50,522 INFO: Full Template Path: D:\Documents\Code\gitlab-automation-suite\app\templates [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:38]
+2025-08-18 18:09:50,523 INFO: --- END PATH DEBUGGING --- [in D:\Documents\Code\gitlab-automation-suite\app\__init__.py:39]

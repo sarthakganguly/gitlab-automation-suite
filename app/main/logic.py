@@ -116,7 +116,6 @@ class ReportGenerator:
 
         total_qa_bugs = len(qa_issues)
         total_prod_bugs = len(prod_issues)
-        # Correctly calculate net total tickets for Dev Escape Rate
         total_tickets = len(total_issues_created) - total_qa_bugs
 
         qa_escape_ratio = (total_prod_bugs / total_qa_bugs) * 100 if total_qa_bugs > 0 else 0
@@ -207,6 +206,270 @@ class ReportGenerator:
         return chart_data, None
 
     @staticmethod
+    def generate_issue_tat_trend_report(gl_service, scope_id, scope_type, months):
+        """Generates data for the issue TAT trend graph."""
+        current_app.logger.info(f"Generating Issue TAT Trend Report for {months} months.")
+        
+        today = datetime.now(timezone.utc)
+        start_date = today - relativedelta(months=int(months))
+        
+        params = {
+            'scope_id': scope_id,
+            'scope_type': scope_type,
+            'state': 'closed',
+            'created_after': start_date.strftime('%Y-%m-%d'),
+            'created_before': today.strftime('%Y-%m-%d')
+        }
+        issues = gl_service.get_all_issues(**params)
+
+        if not issues:
+            return {}, "No closed issues found in the selected period."
+
+        issue_data = []
+        for issue in issues:
+            if issue.created_at and issue.closed_at:
+                created = pd.to_datetime(issue.created_at)
+                closed = pd.to_datetime(issue.closed_at)
+                tat = (closed - created).total_seconds() / (3600 * 24) # TAT in days
+                issue_data.append({'created_at': created, 'tat': tat})
+        
+        if not issue_data:
+            return {}, "No issues with valid created/closed dates found."
+
+        df = pd.DataFrame(issue_data)
+        df.set_index('created_at', inplace=True)
+        
+        weekly_avg_tat = df.resample('W-Mon')['tat'].mean()
+        weekly_avg_tat.dropna(inplace=True)
+
+        labels = weekly_avg_tat.index.strftime('%Y-W%U').tolist()
+        tat_values = weekly_avg_tat.round(2).tolist()
+
+        chart_data = {
+            'labels': labels,
+            'tat_values': tat_values
+        }
+        
+        return chart_data, None
+
+    @staticmethod
+    def generate_time_in_status_report(gl_service, scope_id, scope_type, months, stage_labels):
+        """Generates data for the Time in Status trend graph."""
+        current_app.logger.info(f"Generating Time in Status Report for {months} months.")
+        
+        today = datetime.now(timezone.utc)
+        start_date = today - relativedelta(months=int(months))
+        
+        issues = gl_service.get_all_issues(
+            scope_id=scope_id, 
+            scope_type=scope_type, 
+            created_after=start_date.strftime('%Y-%m-%d')
+        )
+
+        if not issues:
+            return {}, None, "No issues found in the selected period."
+
+        label_to_stage_map = {}
+        all_workflow_labels = set()
+        for stage, labels_str in stage_labels.items():
+            if labels_str:
+                for label in labels_str.split(','):
+                    stripped_label = label.strip()
+                    label_to_stage_map[stripped_label] = stage
+                    all_workflow_labels.add(stripped_label)
+        
+        issues_to_process = [
+            issue for issue in issues 
+            if any(label in all_workflow_labels for label in issue.labels)
+        ]
+
+        if not issues_to_process:
+            return {}, None, "No issues with the specified workflow labels found in the selected period."
+
+        time_entries = []
+        issue_details_for_excel = {}
+
+        for issue in issues_to_process:
+            events = gl_service.get_issue_label_events(issue.project_id, issue.iid)
+            events.sort(key=lambda e: e.created_at)
+            
+            active_labels = {}
+            issue_stage_durations = {stage: 0 for stage, labels in stage_labels.items() if labels}
+
+            for event in events:
+                if not event.label:
+                    continue
+                label_name = event.label['name']
+                stage = label_to_stage_map.get(label_name)
+                
+                if not stage:
+                    continue
+
+                event_time = pd.to_datetime(event.created_at)
+                
+                if event.action == 'add':
+                    active_labels[label_name] = event_time
+                elif event.action == 'remove' and label_name in active_labels:
+                    start_time = active_labels.pop(label_name)
+                    duration_seconds = (event_time - start_time).total_seconds()
+                    time_entries.append({'date': event_time, 'stage': stage, 'duration': duration_seconds})
+                    issue_stage_durations[stage] += duration_seconds
+            
+            issue_details_for_excel[issue.iid] = {
+                'created_date': pd.to_datetime(issue.created_at),
+                'durations': {stage: ReportGenerator._convert_seconds_to_man_days(dur) for stage, dur in issue_stage_durations.items()}
+            }
+
+        if not time_entries:
+            return {}, None, "No workflow label activity found for the issues in this period."
+
+        df_graph = pd.DataFrame(time_entries)
+        df_graph['duration_days'] = df_graph['duration'] / (3600 * 8)
+        
+        weekly_df = df_graph.pivot_table(
+            index=pd.Grouper(key='date', freq='W-Mon'), 
+            columns='stage', 
+            values='duration_days', 
+            aggfunc='sum'
+        ).fillna(0)
+
+        chart_data = {
+            'labels': weekly_df.index.strftime('%Y-W%U').tolist(),
+            'datasets': []
+        }
+        for stage in weekly_df.columns:
+            chart_data['datasets'].append({
+                'label': stage,
+                'data': weekly_df[stage].round(2).tolist()
+            })
+        
+        excel_rows = []
+        excel_epoch = datetime(1899, 12, 30, tzinfo=timezone.utc)
+        for iid, data in issue_details_for_excel.items():
+            row = {'issue iid': iid}
+            delta = data['created_date'] - excel_epoch
+            row['Created Date'] = delta.total_seconds() / (24 * 3600)
+            
+            for stage, duration in data['durations'].items():
+                row[f'time (in days) in workflow stage-{stage}'] = duration
+            excel_rows.append(row)
+            
+        report_df = pd.DataFrame(excel_rows)
+
+        return chart_data, report_df, None
+
+    @staticmethod
+    def generate_triage_to_milestone_report(gl_service, scope_id, scope_type, start_date, end_date, filter_labels=None, include_next_milestones=False):
+        """
+        Generates a detailed, per-issue report for the lag between an issue's
+        first milestone assignment and that milestone's due date.
+        """
+        current_app.logger.info("Generating Triage to Milestone Lag Report based on milestone due dates.")
+        
+        milestones_in_range = gl_service.get_milestones(
+            scope_id, scope_type, start_date=start_date, end_date=end_date
+        )
+        
+        final_milestones = list(milestones_in_range)
+        
+        if include_next_milestones:
+            current_app.logger.info("Including next 3 open milestones.")
+            all_open_milestones = gl_service.get_milestones(scope_id, scope_type, state='active')
+            
+            end_date_dt = pd.to_datetime(end_date, utc=True)
+            future_milestones = [
+                m for m in all_open_milestones 
+                if m.due_date and pd.to_datetime(m.due_date, utc=True) > end_date_dt
+            ]
+            
+            future_milestones.sort(key=lambda m: m.due_date)
+            next_three = future_milestones[:3]
+            
+            combined_milestones = final_milestones + next_three
+            final_milestones = list({m.id: m for m in combined_milestones}.values())
+            final_milestones.sort(key=lambda m: m.due_date if m.due_date else '9999-12-31')
+
+        if not final_milestones:
+            return pd.DataFrame(), "No milestones found for the specified criteria."
+
+        all_issues_unfiltered = []
+        for m in final_milestones:
+            all_issues_unfiltered.extend(gl_service.get_all_issues(
+                scope_id=scope_id, scope_type=scope_type, milestone=m.title
+            ))
+        
+        if not all_issues_unfiltered:
+            return pd.DataFrame(), "No issues found for the selected milestones."
+
+        if filter_labels:
+            required_labels = {label.strip() for label in filter_labels.split(',') if label.strip()}
+            all_issues = [
+                issue for issue in all_issues_unfiltered
+                if not required_labels.isdisjoint(issue.labels)
+            ]
+        else:
+            all_issues = all_issues_unfiltered
+
+        if not all_issues:
+            return pd.DataFrame(), "No issues matched the label filters for the milestones in this period."
+
+        project_cache = {}
+        unique_project_ids = {issue.project_id for issue in all_issues}
+        for pid in unique_project_ids:
+            project = gl_service.get_project(pid)
+            project_cache[pid] = project.name_with_namespace if project else "Unknown Project"
+
+        detailed_lag_data = []
+        milestone_map = {m.id: m for m in final_milestones}
+
+        for issue in all_issues:
+            if not issue.milestone or issue.milestone['id'] not in milestone_map:
+                continue
+
+            milestone = milestone_map[issue.milestone['id']]
+            milestone_due_date = pd.to_datetime(milestone.due_date, utc=True)
+
+            events = gl_service.get_issue_milestone_events(issue.project_id, issue.iid)
+            add_events = sorted([
+                e for e in events 
+                if e.action == 'add' and e.milestone and e.milestone['id'] == milestone.id
+            ], key=lambda e: e.created_at)
+            
+            if not add_events:
+                continue
+
+            first_assignment_event = add_events[0]
+            assignment_date = pd.to_datetime(first_assignment_event.created_at, utc=True)
+            
+            lag = (milestone_due_date - assignment_date).days
+            
+            if lag >= 0:
+                project_name = project_cache.get(issue.project_id, "Unknown Project")
+                
+                issue_type = "NA"
+                for label in issue.labels:
+                    if label.startswith("type::"):
+                        issue_type = label.split("::", 1)[1]
+                        break
+
+                detailed_lag_data.append({
+                    'project_name': project_name,
+                    'issue_iid': issue.iid,
+                    'issue_type': issue_type,
+                    'issue_url': issue.web_url,
+                    'milestone_due_date': milestone_due_date,
+                    'milestone_assigned_date': assignment_date,
+                    'lag_days': lag
+                })
+
+        if not detailed_lag_data:
+            return pd.DataFrame(), "No valid issue assignments found for past milestones in this period."
+
+        report_df = pd.DataFrame(detailed_lag_data)
+        
+        return report_df, None
+
+    @staticmethod
     def generate_epic_report(gl_service, group_id, epic_iid):
         """Generates a report for a specific epic."""
         issues = gl_service.get_epic_issues(group_id, epic_iid)
@@ -269,30 +532,31 @@ class ReportGenerator:
         return pd.DataFrame(issue_data), None
     
     @staticmethod
-    def generate_milestone_list(gl_service, group_id, start_date, end_date):
-        """Generates a list of milestones with issue counts."""
-        milestones = gl_service.get_milestones(group_id)
-        if not milestones: return [], "No milestones found for this group."
+    def generate_milestone_list(gl_service, scope_id, scope_type, start_date, end_date):
+        """Generates a list of milestones with issue counts for a group or project."""
+        milestones = gl_service.get_milestones(scope_id, scope_type, start_date=start_date, end_date=end_date)
+        if not milestones: return [], "No milestones found for this scope."
+        
         milestone_data = []
-        start_dt, end_dt = pd.to_datetime(start_date), pd.to_datetime(end_date)
         for m in milestones:
-            m_dict = m.asdict()
-            due_date_str = m_dict.get('due_date')
-            if due_date_str and (start_dt <= pd.to_datetime(due_date_str) <= end_dt):
-                issues = gl_service.get_all_issues(scope_id=group_id, scope_type='group', milestone=m_dict['title'])
-                milestone_data.append({
-                    'id': m_dict['id'], 'title': m_dict['title'], 'due_date': due_date_str,
-                    'total_issues': len(issues), 'closed_issues': sum(1 for i in issues if i.state == 'closed')
-                })
+            issues = gl_service.get_all_issues(scope_id=scope_id, scope_type=scope_type, milestone=m.title)
+            milestone_data.append({
+                'id': m.id,
+                'group_id': m.group_id,
+                'title': m.title, 
+                'due_date': m.due_date,
+                'total_issues': len(issues), 
+                'closed_issues': sum(1 for i in issues if i.state == 'closed')
+            })
         return milestone_data, None
 
     @staticmethod
-    def generate_detailed_milestone_report(gl_service, group_id, milestone_id):
+    def generate_detailed_milestone_report(gl_service, scope_id, scope_type, group_id, milestone_id):
         """Generates a detailed HTML report for a single milestone."""
         milestone = gl_service.get_single_milestone(group_id, milestone_id)
         if not milestone: return None, "Milestone not found."
         milestone_data = milestone.asdict()
-        issues = gl_service.get_all_issues(scope_id=group_id, scope_type='group', milestone=milestone.title)
+        issues = gl_service.get_all_issues(scope_id=scope_id, scope_type=scope_type, milestone=milestone.title)
         total_issues = len(issues)
         closed_issues = sum(1 for i in issues if i.state == 'closed')
         stats = {

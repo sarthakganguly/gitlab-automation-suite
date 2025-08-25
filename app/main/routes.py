@@ -3,7 +3,7 @@
 
 import traceback
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import (render_template, request, redirect, url_for, flash,
                    session, jsonify, send_file, current_app)
@@ -13,6 +13,21 @@ from app.main import bp
 from app.main.forms import ConnectionForm
 from app.main.services import GitLabService
 from app.main.logic import ReportGenerator, AutomationLogic
+
+def _date_to_excel_ordinal(dt):
+    """Converts a timezone-aware datetime object to an Excel ordinal number."""
+    if pd.isnull(dt):
+        return None
+    # Ensure the datetime is timezone-aware (UTC) before calculations
+    if dt.tzinfo is None:
+        dt = dt.tz_localize('UTC')
+    else:
+        dt = dt.astimezone(timezone.utc)
+    # Excel's epoch starts on 1899-12-30
+    excel_epoch = datetime(1899, 12, 30, tzinfo=timezone.utc)
+    delta = dt - excel_epoch
+    return float(delta.days) + (float(delta.seconds) / 86400)
+
 
 @bp.route('/', methods=['GET', 'POST'])
 def index():
@@ -25,6 +40,7 @@ def index():
             session['gitlab_url'] = form.gitlab_url.data
             session['access_token'] = form.access_token.data
             session['is_connected'] = True
+            session['cached_scope_data'] = {}
             flash('Connection to GitLab established successfully!', 'success')
             return redirect(url_for('main.dashboard'))
         except Exception as e:
@@ -74,6 +90,14 @@ def get_group_children():
     if not session.get('is_connected'): return jsonify({'error': 'Not authenticated'}), 401
     group_id = request.json.get('group_id')
     if not group_id: return jsonify({'error': 'Group ID is required'}), 400
+
+    if 'cached_scope_data' not in session:
+        session['cached_scope_data'] = {}
+
+    if str(group_id) in session['cached_scope_data']:
+        current_app.logger.info(f"Returning cached data for group ID: {group_id}")
+        return jsonify(session['cached_scope_data'][str(group_id)])
+
     try:
         gl_service = GitLabService(session['gitlab_url'], session['access_token'])
         data = gl_service.get_group_details(group_id)
@@ -82,6 +106,11 @@ def get_group_children():
             'subgroups': [{'id': sg.id, 'name': sg.name} for sg in data['subgroups']],
             'projects': [{'id': p.id, 'name': p.name} for p in data['projects']]
         }
+        
+        session['cached_scope_data'][str(group_id)] = response_data
+        session.modified = True
+        current_app.logger.info(f"Fetched and cached new data for group ID: {group_id}")
+
         return jsonify(response_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -97,14 +126,20 @@ def generate_report():
         required_params.append('epic_iid')
     elif report_type == 'defect_trend':
         required_params.extend(['scope_type', 'months', 'qa_labels', 'prod_labels'])
+    elif report_type == 'issue_tat_trend':
+        required_params.extend(['scope_type', 'months'])
+    elif report_type == 'time_in_status':
+        required_params.extend(['scope_type', 'months', 'stage_labels'])
     else:
         required_params.extend(['scope_type', 'start_date', 'end_date'])
 
-    if not all(data.get(k) for k in required_params):
+    # Validate all required params exist, ignoring optional ones
+    if not all(data.get(k) for k in required_params if k not in ['filter_labels', 'include_next_milestones']):
         return jsonify({'error': f'Missing required parameters for {report_type}'}), 400
 
     try:
         gl_service = GitLabService(session['gitlab_url'], session['access_token'])
+        
         report_html, error_msg, report_title = "", None, "Report"
         
         if report_type == 'epic_report':
@@ -112,7 +147,6 @@ def generate_report():
             report_df, error_msg = ReportGenerator.generate_epic_report(gl_service, data['scope_id'], data['epic_iid'])
             if not error_msg:
                 report_html = render_template('_epic_report_results.html', issues=report_df.to_dict('records'))
-                return jsonify({'report_html': report_html, 'download_url': url_for('main.download_report', **data), 'title': report_title})
         elif report_type == 'defect_trend':
             report_title = "Defect Escape Trend"
             chart_data, error_msg = ReportGenerator.generate_defect_trend_report(
@@ -120,10 +154,56 @@ def generate_report():
             )
             if not error_msg:
                 return jsonify({'chart_data': chart_data, 'title': report_title})
+        elif report_type == 'triage_to_milestone':
+            report_title = "Triage to Milestone Lag"
+            report_df, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                gl_service, data['scope_id'], data['scope_type'], 
+                data['start_date'], data['end_date'],
+                filter_labels=data.get('filter_labels'),
+                include_next_milestones=data.get('include_next_milestones', False)
+            )
+            if not error_msg:
+                if report_df.empty:
+                    return jsonify({'error': 'No data available to generate the report.'}), 404
+                
+                graph_df = report_df.groupby('milestone_due_date')['lag_days'].mean().reset_index()
+                graph_df = graph_df.sort_values(by='milestone_due_date')
+                
+                chart_data = {
+                    'labels': graph_df['milestone_due_date'].dt.strftime('%Y-%m-%d').tolist(),
+                    'values': graph_df['lag_days'].round(2).tolist()
+                }
+                return jsonify({
+                    'chart_data': chart_data, 
+                    'title': report_title, 
+                    'download_url': url_for('main.download_report', **data)
+                })
+
+        elif report_type == 'issue_tat_trend':
+            report_title = "Issue TAT Trend"
+            chart_data, error_msg = ReportGenerator.generate_issue_tat_trend_report(
+                gl_service, data['scope_id'], data['scope_type'], data['months']
+            )
+            if not error_msg:
+                return jsonify({'chart_data': chart_data, 'title': report_title})
+        elif report_type == 'time_in_status':
+            report_title = "Time in Status Report"
+            chart_data, report_df, error_msg = ReportGenerator.generate_time_in_status_report(
+                gl_service, data['scope_id'], data['scope_type'], data['months'], data['stage_labels']
+            )
+            if not error_msg:
+                session['time_in_status_df'] = report_df.to_json()
+                return jsonify({'chart_data': chart_data, 'title': report_title, 'download_url': url_for('main.download_time_in_status_report')})
         elif report_type == 'milestone_analytics':
             report_title = "Milestone Analytics"
-            milestones, error_msg = ReportGenerator.generate_milestone_list(gl_service, data['scope_id'], data['start_date'], data['end_date'])
-            if not error_msg: report_html = render_template('_milestone_list.html', milestones=milestones, group_id=data['scope_id'])
+            milestones, error_msg = ReportGenerator.generate_milestone_list(
+                gl_service, data['scope_id'], data['scope_type'], data['start_date'], data['end_date']
+            )
+            if not error_msg: 
+                report_html = render_template('_milestone_list.html', 
+                                              milestones=milestones, 
+                                              scope_id=data['scope_id'], 
+                                              scope_type=data['scope_type'])
         else:
             report_df = pd.DataFrame()
             if report_type == 'defect_escape':
@@ -166,10 +246,34 @@ def download_report():
                 args.get('start_date'), args.get('end_date'),
                 args.get('qa_labels'), args.get('prod_labels')
             )
+        elif report_type == 'triage_to_milestone':
+            # Convert string 'true'/'false' from URL args to boolean
+            include_next = args.get('include_next_milestones', 'false').lower() == 'true'
+            report_df, error_msg = ReportGenerator.generate_triage_to_milestone_report(
+                gl_service, args.get('scope_id'), args.get('scope_type'), 
+                args.get('start_date'), args.get('end_date'),
+                filter_labels=args.get('filter_labels'),
+                include_next_milestones=include_next
+            )
+            if not error_msg and not report_df.empty:
+                report_df['issue_hyperlink'] = report_df.apply(
+                    lambda row: f'=HYPERLINK("{row["issue_url"]}", "{row["issue_iid"]}")',
+                    axis=1
+                )
+                
+                export_df = pd.DataFrame()
+                export_df['project'] = report_df['project_name']
+                export_df['issue iid'] = report_df['issue_hyperlink']
+                export_df['type'] = report_df['issue_type']
+                export_df['milestone date'] = report_df['milestone_due_date'].apply(_date_to_excel_ordinal)
+                export_df['date when milestone was added to the issue'] = report_df['milestone_assigned_date'].apply(_date_to_excel_ordinal)
+                export_df['difference in days'] = report_df['lag_days']
+                report_df = export_df
         
         if error_msg:
             flash(f"Error generating download: {error_msg}", "danger")
             return redirect(url_for('main.dashboard'))
+        
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             report_df.to_excel(writer, index=False, sheet_name=report_type)
@@ -182,13 +286,19 @@ def download_report():
 @bp.route('/download_detailed_milestone_report')
 def download_detailed_milestone_report():
     if not session.get('is_connected'): return redirect(url_for('main.index'))
-    group_id, milestone_id = request.args.get('group_id'), request.args.get('milestone_id')
-    if not group_id or not milestone_id:
-        flash('Group ID and Milestone ID are required.', 'danger')
+    scope_id = request.args.get('scope_id')
+    scope_type = request.args.get('scope_type')
+    group_id = request.args.get('group_id')
+    milestone_id = request.args.get('milestone_id')
+
+    if not all([scope_id, scope_type, group_id, milestone_id]):
+        flash('Scope, Group ID and Milestone ID are required.', 'danger')
         return redirect(url_for('main.dashboard'))
     try:
         gl_service = GitLabService(session['gitlab_url'], session['access_token'])
-        report_html, error_msg = ReportGenerator.generate_detailed_milestone_report(gl_service, group_id, milestone_id)
+        report_html, error_msg = ReportGenerator.generate_detailed_milestone_report(
+            gl_service, scope_id, scope_type, group_id, milestone_id
+        )
         if error_msg:
             flash(f"Error generating report: {error_msg}", "danger")
             return redirect(url_for('main.dashboard'))
@@ -304,7 +414,7 @@ def get_scope_data():
         
         milestones_list = []
         if scope_type == 'group':
-            milestones = gl_service.get_milestones(scope_id)
+            milestones = gl_service.get_milestones(scope_id, scope_type)
             milestones_list = [{'id': m.title, 'text': m.title} for m in milestones] if milestones else []
 
         return jsonify({'milestones': milestones_list})
@@ -516,3 +626,23 @@ def get_lead_cycle_time():
     except Exception as e:
         current_app.logger.error(f"Lead/Cycle time query failed: {e}")
         return jsonify({'error': f'An internal error occurred: {e}'}), 500
+
+@bp.route('/download_time_in_status_report')
+def download_time_in_status_report():
+    if not session.get('is_connected'): return redirect(url_for('main.index'))
+    
+    df_json = session.get('time_in_status_df')
+    if not df_json:
+        flash('No report data found to download.', 'danger')
+        return redirect(url_for('main.dashboard'))
+        
+    try:
+        report_df = pd.read_json(df_json)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            report_df.to_excel(writer, index=False, sheet_name='time_in_status')
+        output.seek(0)
+        return send_file(output, as_attachment=True, download_name="time_in_status_report.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        flash(f"An unexpected error occurred during download: {e}", "danger")
+        return redirect(url_for('main.dashboard'))
