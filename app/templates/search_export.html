@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Search & Export Issues</h3>
+    </div>
+    <div class="card-body">
+        <h4>Step 1: Select a Scope (Group or Project)</h4>
+        <div id="scope-selector-container" class="border p-3 rounded">
+            <nav aria-label="breadcrumb"><ol class="breadcrumb" id="breadcrumb-nav"></ol></nav>
+            <div id="selector-content" class="list-group"></div>
+            <div id="selector-loader" class="text-center d-none mt-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+        </div>
+        <p class="mt-2">Selected Scope: <strong id="selected-scope-text">None</strong></p>
+        <input type="hidden" id="selected-scope-id">
+        <input type="hidden" id="selected-scope-type">
+
+        <hr>
+        <h4>Step 2: Apply Filters</h4>
+        <div id="filter-form">
+            <div class="row">
+                <div class="col-md-12">
+                    <label for="search-text" class="form-label">Search Text (in title or description)</label>
+                    <input type="text" id="search-text" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label for="assignee-input" class="form-label">Assignee Username(s) (comma-separated)</label>
+                    <input type="text" id="assignee-input" class="form-control" placeholder="e.g., user1,user2">
+                </div>
+                <div class="col-md-6">
+                    <label for="author-input" class="form-label">Author Username(s) (comma-separated)</label>
+                    <input type="text" id="author-input" class="form-control" placeholder="e.g., userA,userB">
+                </div>
+                <div class="col-md-6">
+                    <label for="milestone-select" class="form-label">Milestone</label>
+                    <select id="milestone-select" class="form-select"></select>
+                </div>
+                <div class="col-md-6">
+                    <label for="labels-input" class="form-label">Labels (comma-separated)</label>
+                    <input type="text" id="labels-input" class="form-control">
+                </div>
+            </div>
+            <button class="btn btn-primary mt-3" onclick="searchIssues(1)">Search</button>
+            <button class="btn btn-success mt-3" id="export-btn" style="display: none;">Export All to Excel</button>
+        </div>
+        
+        <hr>
+        <h4>Results</h4>
+        <div id="search-results-container">
+            <p class="text-muted">Search results will appear here.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="initial-groups-data" type="application/json">{{ groups|tojson|safe }}</script>
+<script>
+    let breadcrumbState = [{scope_id: 'root', name: 'Root'}];
+    const initialGroups = JSON.parse(document.getElementById('initial-groups-data').textContent.trim());
+    let currentSearchParams = {};
+
+    document.addEventListener('DOMContentLoaded', function() {
+        $('#milestone-select').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Select an option',
+            allowClear: true
+        });
+
+        document.getElementById('selector-content').addEventListener('click', handleScopeSelection);
+        document.getElementById('breadcrumb-nav').addEventListener('click', handleBreadcrumbClick);
+        document.getElementById('search-results-container').addEventListener('click', handlePaginationClick);
+        document.getElementById('export-btn').addEventListener('click', handleExportClick);
+        
+        renderSelectorContent(initialGroups, []);
+    });
+
+    function handleScopeSelection(e) {
+        const link = e.target.closest('a.list-group-item-action');
+        if (!link) return;
+        e.preventDefault();
+        const scopeId = link.dataset.scopeId;
+        const scopeType = link.dataset.scopeType;
+        const scopeName = link.dataset.name;
+        document.getElementById('selected-scope-id').value = scopeId;
+        document.getElementById('selected-scope-type').value = scopeType;
+        document.getElementById('selected-scope-text').textContent = `${scopeName} (${scopeType})`;
+        
+        updateFilterDropdowns(scopeId, scopeType);
+
+        if (scopeType === 'group') {
+            const currentState = breadcrumbState.find(s => s.scope_id == scopeId);
+            if (!currentState) breadcrumbState.push({scope_id: scopeId, name: scopeName});
+            fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleBreadcrumbClick(e) {
+        if (!e.target.matches('a')) return;
+        e.preventDefault();
+        const scopeId = e.target.dataset.scopeId;
+        const stateIndex = breadcrumbState.findIndex(s => s.scope_id == scopeId);
+        if (stateIndex > -1) {
+            breadcrumbState = breadcrumbState.slice(0, stateIndex + 1);
+            if (scopeId === 'root') {
+                renderSelectorContent(initialGroups, []);
+                updateFilterDropdowns(null, null);
+            } else {
+                fetchGroupChildren(scopeId);
+                updateFilterDropdowns(scopeId, 'group');
+            }
+        }
+    }
+
+    function handlePaginationClick(e) {
+        if(e.target.matches('.page-link')) {
+            e.preventDefault();
+            const page = e.target.dataset.page;
+            if(page) searchIssues(parseInt(page));
+        }
+    }
+
+    function handleExportClick(e) {
+        e.preventDefault();
+        const params = new URLSearchParams(currentSearchParams);
+        params.delete('page');
+        window.location.href = `{{ url_for('main.download_search_results') }}?${params.toString()}`;
+    }
+
+    function fetchGroupChildren(groupId) {
+        const loader = document.getElementById('selector-loader');
+        const contentDiv = document.getElementById('selector-content');
+        loader.classList.remove('d-none');
+        contentDiv.innerHTML = '';
+        fetch('{{ url_for("main.get_group_children") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: groupId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            renderSelectorContent(data.subgroups, data.projects);
+        })
+        .catch(error => {
+            loader.classList.add('d-none');
+            contentDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error}</div>`;
+        });
+    }
+    
+    function renderSelectorContent(subgroups, projects) {
+        const contentDiv = document.getElementById('selector-content');
+        let html = '';
+        (subgroups || []).forEach(sg => {
+            html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${sg.id}" data-scope-type="group" data-name="${sg.name}"><i class="bi bi-collection-fill"></i>${sg.name}</a>`;
+        });
+        (projects || []).forEach(p => {
+             html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${p.id}" data-scope-type="project" data-name="${p.name}"><i class="bi bi-kanban"></i>${p.name}</a>`;
+        });
+        if (!html) html = '<p class="text-muted p-2">No subgroups or projects found.</p>';
+        contentDiv.innerHTML = html;
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('breadcrumb-nav');
+        let html = '';
+        breadcrumbState.forEach((state, index) => {
+            if (index === breadcrumbState.length - 1) {
+                html += `<li class="breadcrumb-item active" aria-current="page">${state.name}</li>`;
+            } else {
+                html += `<li class="breadcrumb-item"><a href="#" data-scope-id="${state.scope_id}">${state.name}</a></li>`;
+            }
+        });
+        nav.innerHTML = html;
+    }
+
+    function updateFilterDropdowns(scopeId, scopeType) {
+        $('#milestone-select').empty().trigger('change');
+        if (!scopeId || scopeType !== 'group') return;
+
+        fetch('{{ url_for("main.get_scope_data") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope_id: scopeId, scope_type: scopeType })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) { console.error(data.error); return; }
+            const placeholderMilestone = {id: '', text: 'Select a milestone'};
+            $('#milestone-select').select2({ data: [placeholderMilestone, ...data.milestones], theme: 'bootstrap-5', allowClear: true });
+        });
+    }
+
+    function searchIssues(page = 1) {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        if (!scopeId) { alert('Please select a group or project first.'); return; }
+
+        currentSearchParams = {
+            scope_id: scopeId,
+            scope_type: scopeType,
+            search_text: document.getElementById('search-text').value,
+            assignee: document.getElementById('assignee-input').value,
+            author: document.getElementById('author-input').value,
+            milestone: $('#milestone-select').val(),
+            labels: document.getElementById('labels-input').value,
+            page: page
+        };
+
+        const resultsDiv = document.getElementById('search-results-container');
+        resultsDiv.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><p class="mt-2">Searching...</p></div>';
+        document.getElementById('export-btn').style.display = 'none';
+
+        fetch('{{ url_for("main.search_issues") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentSearchParams)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultsDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            } else {
+                resultsDiv.innerHTML = data.html;
+                if (data.html.includes('table-row')) {
+                    document.getElementById('export-btn').style.display = 'inline-block';
+                }
+            }
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+</script>
+{% endblock %}

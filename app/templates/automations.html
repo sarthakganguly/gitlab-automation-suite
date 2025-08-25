@@ -1,0 +1,276 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Automations</h3>
+    </div>
+    <div class="card-body">
+        <h4>Step 1: Select a Scope (Group or Project)</h4>
+        <div id="scope-selector-container" class="border p-3 rounded">
+            <nav aria-label="breadcrumb"><ol class="breadcrumb" id="breadcrumb-nav"></ol></nav>
+            <div id="selector-content" class="list-group"></div>
+            <div id="selector-loader" class="text-center d-none mt-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+        </div>
+        <p class="mt-2">Selected Scope: <strong id="selected-scope-text">None</strong></p>
+        <input type="hidden" id="selected-scope-id">
+        <input type="hidden" id="selected-scope-type">
+        <hr>
+        <h4>Step 2: Choose an Automation</h4>
+        <div class="accordion" id="automation-accordion">
+             <div class="accordion-item">
+                <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-label-generator">Label Generator</button></h2>
+                <div id="collapse-label-generator" class="accordion-collapse collapse show" data-bs-parent="#automation-accordion">
+                    <div class="accordion-body">
+                        <p>This tool finds open issues that are missing required scoped labels and suggests appropriate ones based on the issue's content.</p>
+                        <div class="row">
+                            <div class="col-md-6"><label for="label-prefixes" class="form-label">Scoped Label Prefixes (comma-separated)</label><input type="text" id="label-prefixes" class="form-control" value="type::, workflow::, priority::"></div>
+                            <div class="col-md-3"><label class="form-label">Created After</label><input type="date" id="lg-start-date" class="form-control"></div>
+                            <div class="col-md-3"><label class="form-label">Created Before</label><input type="date" id="lg-end-date" class="form-control"></div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="runLabelGenerator()">Find Issues & Suggest Labels</button>
+                        <div id="label-generator-results" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+             <div class="accordion-item">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-prd-story">PRD to User Story Creator</button></h2>
+                <div id="collapse-prd-story" class="accordion-collapse collapse" data-bs-parent="#automation-accordion">
+                    <div class="accordion-body">
+                         <p>Paste a Product Requirements Document (PRD) below to automatically generate user stories. A project must be selected to create issues.</p>
+                        <textarea id="prd-input" class="form-control" rows="8" placeholder="Paste your PRD content here..."></textarea>
+                        <button class="btn btn-primary mt-2" onclick="runPrdGenerator()">Generate Stories</button>
+                        <div id="prd-generator-results" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="initial-groups-data" type="application/json">{{ groups|tojson|safe }}</script>
+<script>
+    let breadcrumbState = [{scope_id: 'root', name: 'Root'}];
+    const initialGroups = JSON.parse(document.getElementById('initial-groups-data').textContent.trim());
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('selector-content').addEventListener('click', handleScopeSelection);
+        document.getElementById('breadcrumb-nav').addEventListener('click', handleBreadcrumbClick);
+        document.getElementById('label-generator-results').addEventListener('submit', handleLabelUpdate);
+        document.getElementById('prd-generator-results').addEventListener('click', handleStoryCreation);
+        renderSelectorContent(initialGroups, []);
+    });
+
+    function handleScopeSelection(e) {
+        const link = e.target.closest('a.list-group-item-action');
+        if (!link) return;
+        e.preventDefault();
+        const scopeId = link.dataset.scopeId;
+        const scopeType = link.dataset.scopeType;
+        const scopeName = link.dataset.name;
+        document.getElementById('selected-scope-id').value = scopeId;
+        document.getElementById('selected-scope-type').value = scopeType;
+        document.getElementById('selected-scope-text').textContent = `${scopeName} (${scopeType})`;
+        if (scopeType === 'group') {
+            const currentState = breadcrumbState.find(s => s.scope_id == scopeId);
+            if (!currentState) breadcrumbState.push({scope_id: scopeId, name: scopeName});
+            fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleBreadcrumbClick(e) {
+        if (!e.target.matches('a')) return;
+        e.preventDefault();
+        const scopeId = e.target.dataset.scopeId;
+        const stateIndex = breadcrumbState.findIndex(s => s.scope_id == scopeId);
+        if (stateIndex > -1) {
+            breadcrumbState = breadcrumbState.slice(0, stateIndex + 1);
+            if (scopeId === 'root') renderSelectorContent(initialGroups, []);
+            else fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleLabelUpdate(e) {
+        if (!e.target.classList.contains('update-labels-form')) return;
+        e.preventDefault();
+        const form = e.target;
+        const button = form.querySelector('button[type="submit"]');
+        const originalButtonText = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
+        button.disabled = true;
+
+        const formData = new FormData(form);
+        const labels = [];
+        formData.forEach((value, key) => {
+            if (key.endsWith('_label') && value) labels.push(value);
+        });
+        
+        const payload = {
+            project_id: formData.get('project_id'),
+            issue_iid: formData.get('issue_iid'),
+            labels: labels
+        };
+
+        fetch('{{ url_for("main.update_labels") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const card = form.closest('.card');
+                card.style.transition = 'opacity 0.5s ease';
+                card.style.opacity = '0';
+                setTimeout(() => card.remove(), 500);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => alert(`Network error: ${error}`))
+        .finally(() => {
+            button.innerHTML = originalButtonText;
+            button.disabled = false;
+        });
+    }
+
+    function handleStoryCreation(e) {
+        if (!e.target.classList.contains('create-issue-btn')) return;
+        e.preventDefault();
+        const button = e.target;
+        const originalButtonText = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        button.disabled = true;
+        
+        const storyDiv = button.closest('.story-card');
+        const payload = {
+            project_id: storyDiv.dataset.projectId,
+            title: storyDiv.dataset.title,
+            description: storyDiv.dataset.description
+        };
+
+        fetch('{{ url_for("main.create_issue") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                button.outerHTML = `<a href="${data.issue_url}" target="_blank" class="btn btn-sm btn-success">Created #${data.issue_iid}</a>`;
+            } else {
+                alert(`Error: ${data.error}`);
+                button.innerHTML = originalButtonText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            alert(`Network error: ${error}`);
+            button.innerHTML = originalButtonText;
+            button.disabled = false;
+        });
+    }
+
+    function fetchGroupChildren(groupId) {
+        const loader = document.getElementById('selector-loader');
+        const contentDiv = document.getElementById('selector-content');
+        loader.classList.remove('d-none');
+        contentDiv.innerHTML = '';
+        fetch('{{ url_for("main.get_group_children") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: groupId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            if (data.error) {
+                contentDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            renderSelectorContent(data.subgroups, data.projects);
+        })
+        .catch(error => {
+            loader.classList.add('d-none');
+            contentDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error}</div>`;
+        });
+    }
+    
+    function renderSelectorContent(subgroups, projects) {
+        const contentDiv = document.getElementById('selector-content');
+        let html = '';
+        (subgroups || []).forEach(sg => {
+            html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${sg.id}" data-scope-type="group" data-name="${sg.name}"><i class="bi bi-collection-fill"></i>${sg.name}</a>`;
+        });
+        (projects || []).forEach(p => {
+             html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${p.id}" data-scope-type="project" data-name="${p.name}"><i class="bi bi-kanban"></i>${p.name}</a>`;
+        });
+        if (!html) html = '<p class="text-muted p-2">No subgroups or projects found in this group.</p>';
+        contentDiv.innerHTML = html;
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('breadcrumb-nav');
+        let html = '';
+        breadcrumbState.forEach((state, index) => {
+            if (index === breadcrumbState.length - 1) {
+                html += `<li class="breadcrumb-item active" aria-current="page">${state.name}</li>`;
+            } else {
+                html += `<li class="breadcrumb-item"><a href="#" data-scope-id="${state.scope_id}">${state.name}</a></li>`;
+            }
+        });
+        nav.innerHTML = html;
+    }
+
+    function runLabelGenerator() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        if (!scopeId) { alert('Please select a group or project first.'); return; }
+        
+        const prefixes = document.getElementById('label-prefixes').value;
+        const startDate = document.getElementById('lg-start-date').value;
+        const endDate = document.getElementById('lg-end-date').value;
+        if (!prefixes || !startDate || !endDate) { alert('Please fill in all fields.'); return; }
+
+        const resultsDiv = document.getElementById('label-generator-results');
+        resultsDiv.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><p class="mt-2">Finding issues...</p></div>';
+
+        fetch('{{ url_for("main.label_generator") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope_id: scopeId, scope_type: scopeType, prefixes: prefixes, start_date: startDate, end_date: endDate })
+        })
+        .then(response => response.json()).then(data => {
+            resultsDiv.innerHTML = data.error ? `<div class="alert alert-danger">${data.error}</div>` : data.html;
+        }).catch(error => {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+
+    function runPrdGenerator() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        if (scopeType !== 'project') { alert('Please select a project first.'); return; }
+
+        const prdText = document.getElementById('prd-input').value;
+        if (!prdText.trim()) { alert('Please paste your PRD content.'); return; }
+
+        const resultsDiv = document.getElementById('prd-generator-results');
+        resultsDiv.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><p class="mt-2">Generating stories...</p></div>';
+
+        fetch('{{ url_for("main.prd_to_story") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prd_text: prdText, project_id: scopeId })
+        })
+        .then(response => response.json()).then(data => {
+            resultsDiv.innerHTML = data.error ? `<div class="alert alert-danger">${data.error}</div>` : data.html;
+        }).catch(error => {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+</script>
+{% endblock %}

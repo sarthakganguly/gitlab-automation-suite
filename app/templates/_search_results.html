@@ -1,0 +1,28 @@
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>IID</th>
+                <th>Title</th>
+                <th>Assignee</th>
+                <th>Author</th>
+                <th>Labels</th>
+                <th>Effort (Days)</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for issue in issues %}
+            <tr class="table-row">
+                <td><a href="{{ issue.web_url }}" target="_blank">{{ issue.iid }}</a></td>
+                <td>{{ issue.title }}</td>
+                <td>{{ issue.assignee }}</td>
+                <td>{{ issue.author }}</td>
+                <td>{{ issue.labels }}</td>
+                <td>{{ issue.estimated_effort }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" class="text-center">No issues found matching your criteria.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,35 @@
+<h4>Activity Summary</h4>
+<div class="row">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total MRs</h5>
+                <p class="card-text fs-4">{{ summary.total_mrs }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center text-bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">Opened MRs</h5>
+                <p class="card-text fs-4">{{ summary.mrs_opened }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center text-bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Merged MRs</h5>
+                <p class="card-text fs-4">{{ summary.mrs_merged }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center text-bg-secondary">
+            <div class="card-body">
+                <h5 class="card-title">Closed MRs</h5>
+                <p class="card-text fs-4">{{ summary.mrs_closed }}</p>
+            </div>
+        </div>
+    </div>
+</div>

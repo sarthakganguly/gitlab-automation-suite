@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Connect to GitLab</h3>
+            </div>
+            <div class="card-body">
+                <p>Please provide your GitLab instance URL and a Personal Access Token with 'api' scope.</p>
+                <form method="POST" action="{{ url_for('main.index') }}">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.gitlab_url.label(class="form-label") }}
+                        {{ form.gitlab_url(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.access_token.label(class="form-label") }}
+                        {{ form.access_token(class="form-control") }}
+                    </div>
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

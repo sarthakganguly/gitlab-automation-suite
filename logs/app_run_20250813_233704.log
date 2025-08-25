@@ -1,0 +1,1 @@
+2025-08-14 11:30:30,758 INFO: Fetched ALL 347 issues with filters: {'created_after': '2025-04-01', 'created_before': '2025-05-01', 'all': True, 'include_subgroups': True} [in D:\Documents\Code\gitlab-automation-suite\app\main\services.py:279]

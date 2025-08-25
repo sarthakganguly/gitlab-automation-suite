@@ -1,0 +1,61 @@
+{% if not issues %}
+<div class="alert alert-info">No open issues found missing the specified labels in this scope.</div>
+{% else %}
+<p class="text-muted">Found {{ issues|length }} issues with missing labels. Review the suggestions and update.</p>
+{% for issue in issues %}
+<div class="card mb-3 label-suggestion-card">
+    <div class="card-body">
+        <h5 class="card-title">
+            <a href="{{ issue.web_url }}" target="_blank">#{{ issue.iid }} - {{ issue.title }}</a>
+        </h5>
+        <p class="card-text"><small class="text-muted">Project: {{ issue.references.full.split('#')[0] }}</small></p>
+        <div class="mb-2">
+            <strong>Current Labels:</strong>
+            {% for label in issue.labels %}
+                <span class="badge bg-secondary">{{ label }}</span>
+            {% else %}
+                <span class="badge bg-light text-dark">None</span>
+            {% endfor %}
+        </div>
+        <form class="update-labels-form">
+            <input type="hidden" name="project_id" value="{{ issue.project_id }}">
+            <input type="hidden" name="issue_iid" value="{{ issue.iid }}">
+            <h6><strong>Suggested Labels to Add:</strong></h6>
+            <div class="row">
+                {% if 'type' in issue.suggestions %}
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Type</label>
+                    <select name="type_label" class="form-select form-select-sm">
+                        {% for label in type_labels %}
+                        <option value="{{ label }}" {% if label == issue.suggestions.type %}selected{% endif %}>{{ label.split('::')[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                {% if 'workflow' in issue.suggestions %}
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Workflow</label>
+                    <select name="workflow_label" class="form-select form-select-sm">
+                        {% for label in workflow_labels %}
+                        <option value="{{ label }}" {% if label == issue.suggestions.workflow %}selected{% endif %}>{{ label.split('::')[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                {% if 'priority' in issue.suggestions %}
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Priority</label>
+                    <select name="priority_label" class="form-select form-select-sm">
+                         {% for label in priority_labels %}
+                        <option value="{{ label }}" {% if label == issue.suggestions.priority %}selected{% endif %}>{{ label.split('::')[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-sm btn-success mt-2">Update Labels</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

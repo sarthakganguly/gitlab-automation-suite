@@ -1,0 +1,184 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Value Stream Analytics</h3>
+    </div>
+    <div class="card-body">
+        <h4>Step 1: Select a Scope (Group or Project)</h4>
+        <div id="scope-selector-container" class="border p-3 rounded">
+            <nav aria-label="breadcrumb"><ol class="breadcrumb" id="breadcrumb-nav"></ol></nav>
+            <div id="selector-content" class="list-group"></div>
+            <div id="selector-loader" class="text-center d-none mt-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+        </div>
+        <p class="mt-2">Selected Scope: <strong id="selected-scope-text">None</strong></p>
+        <input type="hidden" id="selected-scope-id">
+        <input type="hidden" id="selected-scope-type">
+        <hr>
+
+        <h4>Step 2: Select Date Range</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="start-date" class="form-label">From</label>
+                <input type="date" id="start-date" class="form-control">
+            </div>
+            <div class="col-md-6">
+                <label for="end-date" class="form-label">To</label>
+                <input type="date" id="end-date" class="form-control">
+            </div>
+        </div>
+        <button class="btn btn-primary mt-2" id="generate-vsa-report-btn">Generate Report</button>
+        
+        <hr>
+        <h4>Results</h4>
+        <div id="vsa-results-container">
+            <p class="text-muted">Report results will appear here.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="initial-groups-data" type="application/json">{{ groups|tojson|safe }}</script>
+<script>
+    let breadcrumbState = [{scope_id: 'root', name: 'Root'}];
+    const initialGroups = JSON.parse(document.getElementById('initial-groups-data').textContent.trim());
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('selector-content').addEventListener('click', handleScopeSelection);
+        document.getElementById('breadcrumb-nav').addEventListener('click', handleBreadcrumbClick);
+        document.getElementById('generate-vsa-report-btn').addEventListener('click', generateVSAReport);
+        
+        renderSelectorContent(initialGroups, []);
+
+        if (initialGroups && initialGroups.length > 0) {
+            const defaultGroup = initialGroups[0];
+            document.getElementById('selected-scope-id').value = defaultGroup.id;
+            document.getElementById('selected-scope-type').value = 'group';
+            document.getElementById('selected-scope-text').textContent = `${defaultGroup.name} (group)`;
+            breadcrumbState.push({scope_id: defaultGroup.id, name: defaultGroup.name});
+            fetchGroupChildren(defaultGroup.id); 
+        }
+    });
+
+    function handleScopeSelection(e) {
+        const link = e.target.closest('a.list-group-item-action');
+        if (!link) return;
+        e.preventDefault();
+        const scopeId = link.dataset.scopeId;
+        const scopeType = link.dataset.scopeType;
+        const scopeName = link.dataset.name;
+        document.getElementById('selected-scope-id').value = scopeId;
+        document.getElementById('selected-scope-type').value = scopeType;
+        document.getElementById('selected-scope-text').textContent = `${scopeName} (${scopeType})`;
+        if (scopeType === 'group') {
+            const currentState = breadcrumbState.find(s => s.scope_id == scopeId);
+            if (!currentState) breadcrumbState.push({scope_id: scopeId, name: scopeName});
+            fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleBreadcrumbClick(e) {
+        if (!e.target.matches('a')) return;
+        e.preventDefault();
+        const scopeId = e.target.dataset.scopeId;
+        const stateIndex = breadcrumbState.findIndex(s => s.scope_id == scopeId);
+        if (stateIndex > -1) {
+            breadcrumbState = breadcrumbState.slice(0, stateIndex + 1);
+            if (scopeId === 'root') renderSelectorContent(initialGroups, []);
+            else fetchGroupChildren(scopeId);
+        }
+    }
+    
+    function fetchGroupChildren(groupId) {
+        const loader = document.getElementById('selector-loader');
+        const contentDiv = document.getElementById('selector-content');
+        loader.classList.remove('d-none');
+        contentDiv.innerHTML = '';
+        fetch('{{ url_for("main.get_group_children") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: groupId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            if (data.error) {
+                contentDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            renderSelectorContent(data.subgroups, data.projects);
+        })
+        .catch(error => {
+            loader.classList.add('d-none');
+            contentDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error}</div>`;
+        });
+    }
+    
+    function renderSelectorContent(subgroups, projects) {
+        const contentDiv = document.getElementById('selector-content');
+        let html = '';
+        (subgroups || []).forEach(sg => {
+            html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${sg.id}" data-scope-type="group" data-name="${sg.name}"><i class="bi bi-collection-fill"></i>${sg.name}</a>`;
+        });
+        (projects || []).forEach(p => {
+             html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${p.id}" data-scope-type="project" data-name="${p.name}"><i class="bi bi-kanban"></i>${p.name}</a>`;
+        });
+        if (!html) html = '<p class="text-muted p-2">No subgroups or projects found in this group.</p>';
+        contentDiv.innerHTML = html;
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('breadcrumb-nav');
+        let html = '';
+        breadcrumbState.forEach((state, index) => {
+            if (index === breadcrumbState.length - 1) {
+                html += `<li class="breadcrumb-item active" aria-current="page">${state.name}</li>`;
+            } else {
+                html += `<li class="breadcrumb-item"><a href="#" data-scope-id="${state.scope_id}">${state.name}</a></li>`;
+            }
+        });
+        nav.innerHTML = html;
+    }
+
+    function generateVSAReport() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+
+        if (!scopeId || !startDate || !endDate) {
+            alert('Please select a scope and a full date range.');
+            return;
+        }
+
+        const resultsDiv = document.getElementById('vsa-results-container');
+        resultsDiv.innerHTML = '<div class="text-center p-5"><div class="spinner-border" role="status"></div><p class="mt-2">Generating report... This may take a moment.</p></div>';
+
+        fetch('{{ url_for("main.get_vsa_data") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                scope_id: scopeId,
+                scope_type: scopeType,
+                start_date: startDate,
+                end_date: endDate
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultsDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            } else {
+                resultsDiv.innerHTML = data.html;
+                // The script to render the chart is now included in the returned HTML snippet
+            }
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+</script>
+{% endblock %}

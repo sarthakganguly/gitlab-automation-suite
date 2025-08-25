@@ -1,0 +1,60 @@
+<div class="row">
+    <div class="col-md-4"><div class="stat-card"><h5>Median Lead Time</h5><h3>{{ metrics.lead_time or 'N/A' }}</h3></div></div>
+    <div class="col-md-4"><div class="stat-card"><h5>Median Cycle Time</h5><h3>{{ metrics.cycle_time or 'N/A' }}</h3></div></div>
+    <div class="col-md-4"><div class="stat-card"><h5>New Issues</h5><h3>{{ metrics.issues_created }}</h3></div></div>
+    <div class="col-md-6"><div class="stat-card"><h5>Issues Closed</h5><h3>{{ metrics.issues_closed }}</h3></div></div>
+    <div class="col-md-6"><div class="stat-card"><h5>MRs Merged</h5><h3>{{ metrics.mrs_merged }}</h3></div></div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        Lead & Cycle Time Trend (Last 6 Months)
+    </div>
+    <div class="card-body">
+        <div class="chart-container" style="height: 50vh;">
+            <canvas id="vsaChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const ctx = document.getElementById('vsaChart');
+    if (!ctx) return;
+
+    const chartData = {{ chart_data|tojson|safe }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Lead Time (Days)',
+                data: chartData.lead_times,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+                yAxisID: 'y',
+            }, {
+                label: 'Cycle Time (Days)',
+                data: chartData.cycle_times,
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1,
+                yAxisID: 'y',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Median Time (Days)'
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>

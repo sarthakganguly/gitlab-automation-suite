@@ -1,0 +1,184 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Lead & Cycle Time Metrics</h3>
+    </div>
+    <div class="card-body">
+        <h4>Step 1: Select a Scope (Group or Project)</h4>
+        <div id="scope-selector-container" class="border p-3 rounded">
+            <nav aria-label="breadcrumb"><ol class="breadcrumb" id="breadcrumb-nav"></ol></nav>
+            <div id="selector-content" class="list-group"></div>
+            <div id="selector-loader" class="text-center d-none mt-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+        </div>
+        <p class="mt-2">Selected Scope: <strong id="selected-scope-text">None</strong></p>
+        <input type="hidden" id="selected-scope-id">
+        <input type="hidden" id="selected-scope-type">
+        <hr>
+        <h4>Step 2: Select Date Range</h4>
+        <div class="row">
+            <div class="col-md-5"><label class="form-label">Start Date</label><input type="date" id="start-date" class="form-control"></div>
+            <div class="col-md-5"><label class="form-label">End Date</label><input type="date" id="end-date" class="form-control"></div>
+            <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100" onclick="generateLeadCycleTime()">Generate</button></div>
+        </div>
+        <hr>
+        <h4>Results</h4>
+        <div id="results-container" class="row">
+            <div class="col-md-6">
+                <div class="card text-center">
+                    <div class="card-header">Median Lead Time</div>
+                    <div class="card-body">
+                        <h3 class="card-title" id="lead-time-result">--</h3>
+                        <p class="card-text text-muted">Time from issue creation to closure.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card text-center">
+                    <div class="card-header">Median Cycle Time</div>
+                    <div class="card-body">
+                        <h3 class="card-title" id="cycle-time-result">--</h3>
+                        <p class="card-text text-muted">Time from first commit to issue closure.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="initial-groups-data" type="application/json">{{ groups|tojson|safe }}</script>
+<script>
+    let breadcrumbState = [{scope_id: 'root', name: 'Root'}];
+    const initialGroups = JSON.parse(document.getElementById('initial-groups-data').textContent.trim());
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('selector-content').addEventListener('click', handleScopeSelection);
+        document.getElementById('breadcrumb-nav').addEventListener('click', handleBreadcrumbClick);
+        renderSelectorContent(initialGroups, []);
+    });
+
+    function handleScopeSelection(e) {
+        const link = e.target.closest('a.list-group-item-action');
+        if (!link) return;
+        e.preventDefault();
+        const scopeId = link.dataset.scopeId;
+        const scopeType = link.dataset.scopeType;
+        const scopeName = link.dataset.name;
+        document.getElementById('selected-scope-id').value = scopeId;
+        document.getElementById('selected-scope-type').value = scopeType;
+        document.getElementById('selected-scope-text').textContent = `${scopeName} (${scopeType})`;
+        if (scopeType === 'group') {
+            const currentState = breadcrumbState.find(s => s.scope_id == scopeId);
+            if (!currentState) breadcrumbState.push({scope_id: scopeId, name: scopeName});
+            fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleBreadcrumbClick(e) {
+        if (!e.target.matches('a')) return;
+        e.preventDefault();
+        const scopeId = e.target.dataset.scopeId;
+        const stateIndex = breadcrumbState.findIndex(s => s.scope_id == scopeId);
+        if (stateIndex > -1) {
+            breadcrumbState = breadcrumbState.slice(0, stateIndex + 1);
+            if (scopeId === 'root') renderSelectorContent(initialGroups, []);
+            else fetchGroupChildren(scopeId);
+        }
+    }
+    
+    function fetchGroupChildren(groupId) {
+        const loader = document.getElementById('selector-loader');
+        const contentDiv = document.getElementById('selector-content');
+        loader.classList.remove('d-none');
+        contentDiv.innerHTML = '';
+        fetch('{{ url_for("main.get_group_children") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: groupId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            renderSelectorContent(data.subgroups, data.projects);
+        })
+        .catch(error => {
+            loader.classList.add('d-none');
+            contentDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error}</div>`;
+        });
+    }
+    
+    function renderSelectorContent(subgroups, projects) {
+        const contentDiv = document.getElementById('selector-content');
+        let html = '';
+        (subgroups || []).forEach(sg => {
+            html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${sg.id}" data-scope-type="group" data-name="${sg.name}"><i class="bi bi-collection-fill"></i>${sg.name}</a>`;
+        });
+        (projects || []).forEach(p => {
+             html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${p.id}" data-scope-type="project" data-name="${p.name}"><i class="bi bi-kanban"></i>${p.name}</a>`;
+        });
+        if (!html) html = '<p class="text-muted p-2">No subgroups or projects found.</p>';
+        contentDiv.innerHTML = html;
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('breadcrumb-nav');
+        let html = '';
+        breadcrumbState.forEach((state, index) => {
+            if (index === breadcrumbState.length - 1) {
+                html += `<li class="breadcrumb-item active" aria-current="page">${state.name}</li>`;
+            } else {
+                html += `<li class="breadcrumb-item"><a href="#" data-scope-id="${state.scope_id}">${state.name}</a></li>`;
+            }
+        });
+        nav.innerHTML = html;
+    }
+
+    function generateLeadCycleTime() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+
+        if (!scopeId || !startDate || !endDate) {
+            alert('Please select a scope and a full date range.');
+            return;
+        }
+
+        const leadTimeResult = document.getElementById('lead-time-result');
+        const cycleTimeResult = document.getElementById('cycle-time-result');
+        leadTimeResult.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
+        cycleTimeResult.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
+
+        fetch('{{ url_for("main.get_lead_cycle_time") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                scope_id: scopeId,
+                scope_type: scopeType,
+                start_date: startDate,
+                end_date: endDate
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`Error: ${data.error}`);
+                leadTimeResult.textContent = '--';
+                cycleTimeResult.textContent = '--';
+                return;
+            }
+            leadTimeResult.textContent = data.lead_time;
+            cycleTimeResult.textContent = data.cycle_time;
+        })
+        .catch(error => {
+            alert(`A network error occurred: ${error}`);
+            leadTimeResult.textContent = '--';
+            cycleTimeResult.textContent = '--';
+        });
+    }
+</script>
+{% endblock %}

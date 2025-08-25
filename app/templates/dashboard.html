@@ -1,0 +1,386 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Productivity Metrics</h3>
+    </div>
+    <div class="card-body">
+        <h4>Step 1: Select a Scope (Group or Project)</h4>
+        <div id="scope-selector-container" class="border p-3 rounded">
+            <nav aria-label="breadcrumb"><ol class="breadcrumb" id="breadcrumb-nav"></ol></nav>
+            <div id="selector-content" class="list-group"></div>
+            <div id="selector-loader" class="text-center d-none mt-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+        </div>
+        <p class="mt-2">Selected Scope: <strong id="selected-scope-text">None</strong></p>
+        <input type="hidden" id="selected-scope-id">
+        <input type="hidden" id="selected-scope-type">
+        <hr>
+        <h4>Step 2: Choose a Report</h4>
+        <div class="accordion" id="productivity-accordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-defect-escape">Defect Escape Ratio</button></h2>
+                <div id="collapse-defect-escape" class="accordion-collapse collapse" data-bs-parent="#productivity-accordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                            <div class="col-md-6"><label class="form-label">Date Range (From)</label><input type="date" id="der-start-date" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Date Range (To)</label><input type="date" id="der-end-date" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">QA Bug Labels</label><input type="text" id="der-qa-labels" class="form-control" placeholder="e.g., type::bug,qa-fail"></div>
+                            <div class="col-md-6"><label class="form-label">Production Bug Labels</label><input type="text" id="der-prod-labels" class="form-control" placeholder="e.g., found-post-release,prod-bug"></div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="generateReport('defect_escape')">Generate Report</button>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-issue-analytics">Issue Analytics</button></h2>
+                <div id="collapse-issue-analytics" class="accordion-collapse collapse" data-bs-parent="#productivity-accordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                             <div class="col-md-6"><label class="form-label">Date Range (From)</label><input type="date" id="ia-start-date" class="form-control"></div>
+                             <div class="col-md-6"><label class="form-label">Date Range (To)</label><input type="date" id="ia-end-date" class="form-control"></div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="generateReport('issue_analytics')">Generate Report</button>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-milestone-analytics">Milestone Analytics</button></h2>
+                <div id="collapse-milestone-analytics" class="accordion-collapse collapse" data-bs-parent="#productivity-accordion">
+                    <div class="accordion-body">
+                        <p>This report is available for groups only.</p>
+                        <div class="row">
+                             <div class="col-md-6"><label class="form-label">Milestone Due Date Range (From)</label><input type="date" id="ma-start-date" class="form-control"></div>
+                             <div class="col-md-6"><label class="form-label">Milestone Due Date Range (To)</label><input type="date" id="ma-end-date" class="form-control"></div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="generateReport('milestone_analytics')">Generate Report</button>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-epic-report">Epic Report</button>
+                </h2>
+                <div id="collapse-epic-report" class="accordion-collapse collapse" data-bs-parent="#productivity-accordion">
+                    <div class="accordion-body">
+                        <p>Search for an epic within the selected group to generate a report of its issues. This is only available when a group is selected.</p>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <label for="epic-search" class="form-label">Search for an Epic</label>
+                                <select id="epic-search" class="form-select"></select>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="generateEpicReport()">Generate Report</button>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-defect-trend">Defect Escape Trend Graph</button>
+                </h2>
+                <div id="collapse-defect-trend" class="accordion-collapse collapse" data-bs-parent="#productivity-accordion">
+                    <div class="accordion-body">
+                        <p>Generate a trend graph for Defect Escape and Dev Escape rates over the last few months.</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="trend-months" class="form-label">Months</label>
+                                <select id="trend-months" class="form-select">
+                                    {% for i in range(2, 13) %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">QA Bug Labels</label>
+                                <input type="text" id="trend-qa-labels" class="form-control" placeholder="e.g., type::bug,qa-fail">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Production Bug Labels</label>
+                                <input type="text" id="trend-prod-labels" class="form-control" placeholder="e.g., prod-bug">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary mt-2" onclick="generateTrendGraph()">Generate Trend</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="initial-groups-data" type="application/json">{{ groups|tojson|safe }}</script>
+<script>
+    let breadcrumbState = [{scope_id: 'root', name: 'Root'}];
+    const initialGroups = JSON.parse(document.getElementById('initial-groups-data').textContent.trim());
+    let reportModal;
+    let trendChart = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+        
+        document.getElementById('selector-content').addEventListener('click', handleScopeSelection);
+        document.getElementById('breadcrumb-nav').addEventListener('click', handleBreadcrumbClick);
+        
+        renderSelectorContent(initialGroups, []);
+
+        $('#epic-search').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Type to search for an epic...',
+            minimumInputLength: 2,
+            ajax: {
+                url: '{{ url_for("main.search_epics") }}',
+                type: 'POST',
+                dataType: 'json',
+                delay: 250,
+                contentType: 'application/json',
+                processResults: function (data) {
+                    return { results: data };
+                },
+                data: function (params) {
+                    const scopeId = document.getElementById('selected-scope-id').value;
+                    return JSON.stringify({ group_id: scopeId, search_term: params.term });
+                }
+            }
+        });
+    });
+
+    function handleScopeSelection(e) {
+        const link = e.target.closest('a.list-group-item-action');
+        if (!link) return;
+        e.preventDefault();
+        const scopeId = link.dataset.scopeId;
+        const scopeType = link.dataset.scopeType;
+        const scopeName = link.dataset.name;
+        document.getElementById('selected-scope-id').value = scopeId;
+        document.getElementById('selected-scope-type').value = scopeType;
+        document.getElementById('selected-scope-text').textContent = `${scopeName} (${scopeType})`;
+        if (scopeType === 'group') {
+            const currentState = breadcrumbState.find(s => s.scope_id == scopeId);
+            if (!currentState) breadcrumbState.push({scope_id: scopeId, name: scopeName});
+            fetchGroupChildren(scopeId);
+        }
+    }
+
+    function handleBreadcrumbClick(e) {
+        if (!e.target.matches('a')) return;
+        e.preventDefault();
+        const scopeId = e.target.dataset.scopeId;
+        const stateIndex = breadcrumbState.findIndex(s => s.scope_id == scopeId);
+        if (stateIndex > -1) {
+            breadcrumbState = breadcrumbState.slice(0, stateIndex + 1);
+            if (scopeId === 'root') renderSelectorContent(initialGroups, []);
+            else fetchGroupChildren(scopeId);
+        }
+    }
+    
+    function fetchGroupChildren(groupId) {
+        const loader = document.getElementById('selector-loader');
+        const contentDiv = document.getElementById('selector-content');
+        loader.classList.remove('d-none');
+        contentDiv.innerHTML = '';
+        fetch('{{ url_for("main.get_group_children") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: groupId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            if (data.error) {
+                contentDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            renderSelectorContent(data.subgroups, data.projects);
+        })
+        .catch(error => {
+            loader.classList.add('d-none');
+            contentDiv.innerHTML = `<div class="alert alert-danger">An error occurred: ${error}</div>`;
+        });
+    }
+    
+    function renderSelectorContent(subgroups, projects) {
+        const contentDiv = document.getElementById('selector-content');
+        let html = '';
+        (subgroups || []).forEach(sg => {
+            html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${sg.id}" data-scope-type="group" data-name="${sg.name}"><i class="bi bi-collection-fill"></i>${sg.name}</a>`;
+        });
+        (projects || []).forEach(p => {
+             html += `<a href="#" class="list-group-item list-group-item-action" data-scope-id="${p.id}" data-scope-type="project" data-name="${p.name}"><i class="bi bi-kanban"></i>${p.name}</a>`;
+        });
+        if (!html) html = '<p class="text-muted p-2">No subgroups or projects found in this group.</p>';
+        contentDiv.innerHTML = html;
+        updateBreadcrumb();
+    }
+
+    function updateBreadcrumb() {
+        const nav = document.getElementById('breadcrumb-nav');
+        let html = '';
+        breadcrumbState.forEach((state, index) => {
+            if (index === breadcrumbState.length - 1) {
+                html += `<li class="breadcrumb-item active" aria-current="page">${state.name}</li>`;
+            } else {
+                html += `<li class="breadcrumb-item"><a href="#" data-scope-id="${state.scope_id}">${state.name}</a></li>`;
+            }
+        });
+        nav.innerHTML = html;
+    }
+
+    function generateEpicReport() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        const epicIid = $('#epic-search').val();
+
+        if (scopeType !== 'group') {
+            alert('Please select a group to generate an epic report.');
+            return;
+        }
+        if (!epicIid) {
+            alert('Please search for and select an epic.');
+            return;
+        }
+
+        const payload = {
+            report_type: 'epic_report',
+            scope_id: scopeId,
+            epic_iid: epicIid,
+            start_date: '1970-01-01', // Dummy date
+            end_date: '2070-01-01'     // Dummy date
+        };
+        
+        showModalAndFetchReport(payload, "Generating Epic Report...");
+    }
+
+    function generateTrendGraph() {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        if (!scopeId) { alert('Please select a group or project first.'); return; }
+
+        const payload = {
+            report_type: 'defect_trend',
+            scope_id: scopeId,
+            scope_type: scopeType,
+            months: document.getElementById('trend-months').value,
+            qa_labels: document.getElementById('trend-qa-labels').value,
+            prod_labels: document.getElementById('trend-prod-labels').value
+        };
+
+        if (!payload.qa_labels || !payload.prod_labels) {
+            alert('Please provide both QA and Production bug labels.');
+            return;
+        }
+        
+        showModalAndFetchReport(payload, "Generating Trend Graph...");
+    }
+
+    function generateReport(reportType) {
+        const scopeId = document.getElementById('selected-scope-id').value;
+        const scopeType = document.getElementById('selected-scope-type').value;
+        if (!scopeId) { alert('Please select a group or project first.'); return; }
+        
+        if (reportType === 'milestone_analytics' && scopeType !== 'group') {
+            alert('Milestone Analytics is only available for groups.');
+            return;
+        }
+
+        let payload = { report_type: reportType, scope_id: scopeId, scope_type: scopeType };
+        if (reportType === 'defect_escape') {
+            payload.start_date = document.getElementById('der-start-date').value;
+            payload.end_date = document.getElementById('der-end-date').value;
+            payload.qa_labels = document.getElementById('der-qa-labels').value;
+            payload.prod_labels = document.getElementById('der-prod-labels').value;
+        } else if (reportType === 'issue_analytics' || reportType === 'milestone_analytics') {
+            const prefix = reportType === 'issue_analytics' ? 'ia' : 'ma';
+            payload.start_date = document.getElementById(`${prefix}-start-date`).value;
+            payload.end_date = document.getElementById(`${prefix}-end-date`).value;
+        }
+
+        for (const key in payload) {
+            if (!payload[key]) { alert(`Please fill in all fields for the report.`); return; }
+        }
+        
+        showModalAndFetchReport(payload, "Generating Report...");
+    }
+
+    function showModalAndFetchReport(payload, title) {
+        const modalBody = document.getElementById('reportModalBody');
+        const modalTitle = document.getElementById('reportModalLabel');
+        const downloadBtn = document.getElementById('downloadReportBtn');
+        modalTitle.textContent = title;
+        modalBody.innerHTML = '<div class="text-center p-5"><div class="spinner-border" role="status"></div></div>';
+        downloadBtn.style.display = 'none';
+        reportModal.show();
+
+        fetch('{{ url_for("main.generate_report") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                modalBody.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                modalTitle.textContent = "Error";
+                return;
+            }
+            modalTitle.textContent = data.title;
+
+            if (data.chart_data) {
+                modalBody.innerHTML = '<canvas id="trendChartCanvas"></canvas>';
+                const ctx = document.getElementById('trendChartCanvas').getContext('2d');
+                if (trendChart) trendChart.destroy();
+                trendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.chart_data.labels,
+                        datasets: [{
+                            label: 'Defect Escape Ratio (%)',
+                            data: data.chart_data.defect_escape_ratios,
+                            borderColor: 'rgb(255, 99, 132)',
+                            tension: 0.1
+                        }, {
+                            label: 'Dev Escape Rate (%)',
+                            data: data.chart_data.dev_escape_rates,
+                            borderColor: 'rgb(54, 162, 235)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Percentage (%)' } } },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    footer: function(tooltipItems) {
+                                        const index = tooltipItems[0].dataIndex;
+                                        const totalBugs = data.chart_data.total_qa_bugs[index];
+                                        const totalIssues = data.chart_data.total_tickets[index];
+                                        const prodIssues = data.chart_data.total_prod_bugs[index];
+                                        
+                                        return [
+                                            '',
+                                            `Total QA Bugs: ${totalBugs}`,
+                                            `Total Production Bugs: ${prodIssues}`,
+                                            `Total Issues (net): ${totalIssues}`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                modalBody.innerHTML = data.report_html;
+                if (data.download_url) {
+                    downloadBtn.href = data.download_url;
+                    downloadBtn.style.display = 'inline-block';
+                }
+            }
+        })
+        .catch(error => {
+            modalTitle.textContent = "Error";
+            modalBody.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+</script>
+{% endblock %}

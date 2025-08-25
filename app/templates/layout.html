@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitLab Analytics Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+        .navbar { background-color: #292961; }
+        .navbar-brand { color: #fff !important; }
+        .card { margin-top: 20px; }
+        .form-control, .form-select { margin-bottom: 1rem; }
+        .btn-primary { background-color: #4a4aff; border-color: #4a4aff; }
+        .btn-primary:hover { background-color: #3535d3; border-color: #3535d3; }
+        .spinner-border { width: 1.5rem; height: 1.5rem; }
+        #scope-selector-container .list-group-item { cursor: pointer; }
+        #scope-selector-container .list-group-item:hover { background-color: #e9ecef; }
+        #selector-content { max-height: 350px; overflow-y: auto; }
+        .breadcrumb-item a { text-decoration: none; }
+        .list-group-item .bi { margin-right: 8px; }
+        .table-responsive { max-height: 400px; }
+        .label-suggestion-card { border-left: 4px solid #fd7e14; }
+        .select2-container--bootstrap-5 .select2-selection { min-height: calc(1.5em + .75rem + 2px); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') if session.is_connected else url_for('main.index') }}">GitLab Analytics Hub</a>
+            {% if session.is_connected %}
+            <div class="d-flex">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-light me-2">Metrics</a>
+                <a href="{{ url_for('main.automations_page') }}" class="btn btn-outline-light me-2">Automations</a>
+                <a href="{{ url_for('main.search_export_page') }}" class="btn btn-outline-light me-2">Search & Export</a>
+                <a href="{{ url_for('main.team_activity_page') }}" class="btn btn-outline-light me-2">Team Activity</a>
+                <a href="{{ url_for('main.lead_cycle_time_page') }}" class="btn btn-outline-light me-2">Lead & Cycle Time</a>
+                <a href="{{ url_for('main.logout') }}" class="btn btn-outline-light">Logout</a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        <pre style="white-space: pre-wrap;">{{ message }}</pre>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Report Modal -->
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="reportModalLabel">Report Results</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="reportModalBody"></div>
+          <div class="modal-footer">
+            <a href="#" id="downloadReportBtn" class="btn btn-success" style="display: none;">Download as Excel</a>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

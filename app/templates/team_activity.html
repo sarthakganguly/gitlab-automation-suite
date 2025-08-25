@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Team Activity Tracker</h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <label for="user-search" class="form-label">Search for a User</label>
+                <select id="user-search" class="form-select"></select>
+            </div>
+        </div>
+
+        <div id="activity-content" class="mt-4" style="display: none;">
+            <div id="summary-container"></div>
+            <div id="work-table-container" class="mt-4"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const userSearch = $('#user-search');
+        
+        userSearch.select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Type a name or username to search...',
+            minimumInputLength: 2,
+            ajax: {
+                url: '{{ url_for("main.search_users") }}',
+                type: 'POST',
+                dataType: 'json',
+                delay: 250,
+                contentType: 'application/json',
+                processResults: function (data) {
+                    return { results: data };
+                },
+                data: function (params) {
+                    return JSON.stringify({ search_term: params.term });
+                }
+            }
+        });
+
+        userSearch.on('select2:select', function (e) {
+            const username = e.params.data.id;
+            document.getElementById('activity-content').style.display = 'block';
+            fetchUserActivity(username, 'current'); // Default to current work
+        });
+    });
+
+    function fetchUserActivity(username, timePeriod) {
+        const summaryContainer = document.getElementById('summary-container');
+        const tableContainer = document.getElementById('work-table-container');
+        
+        summaryContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div></div>';
+        tableContainer.innerHTML = '';
+
+        fetch('{{ url_for("main.get_user_activity") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, time_period: timePeriod })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                summaryContainer.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            summaryContainer.innerHTML = data.summary_html;
+            tableContainer.innerHTML = data.table_html;
+        })
+        .catch(error => {
+            summaryContainer.innerHTML = `<div class="alert alert-danger">A network error occurred: ${error}</div>`;
+        });
+    }
+</script>
+{% endblock %}
