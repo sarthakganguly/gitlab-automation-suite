@@ -10,7 +10,7 @@ class Config:
 
     # Add these two lines for your internal LiteLLM gateway
     LITELLM_GATEWAY_URL = "https://prism-api.hinagro.com/gateway"
-    LITELLM_GATEWAY_KEY = "sk-bjQv4QrTcUd9Qh8HlXJ_Rw"
+    LITELLM_GATEWAY_KEY = ""
     
     # Predefined Labels
     WORKFLOW_LABELS = [
