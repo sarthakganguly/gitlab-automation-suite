@@ -9,7 +9,7 @@ class Config:
     CHATGPT_API_KEY = os.environ.get('CHATGPT_API_KEY') 
 
     # Add these two lines for your internal LiteLLM gateway
-    LITELLM_GATEWAY_URL = "https://prism-api.hinagro.com/gateway"
+    LITELLM_GATEWAY_URL = ""
     LITELLM_GATEWAY_KEY = ""
     
     # Predefined Labels
